@@ -1,49 +1,50 @@
 const express = require('express')
 const cors = require('cors')
+const { PrismaClient } = require('@prisma/client')
 
 const app = express()
+const prisma = new PrismaClient()
 
-app.use(cors())          // permite o frontend se comunicar com o backend
-app.use(express.json())  // permite receber dados em formato JSON
-
-// Array que vai guardar as tarefas na memória
-let tarefas = []
-let proximoId = 1
+app.use(cors())
+app.use(express.json())
 
 // GET /tarefas → retorna todas as tarefas
-app.get('/tarefas', (req, res) => {
+app.get('/tarefas', async (req, res) => {
+  const tarefas = await prisma.tarefa.findMany()
   res.json(tarefas)
 })
 
 // POST /tarefas → cria uma nova tarefa
-app.post('/tarefas', (req, res) => {
+app.post('/tarefas', async (req, res) => {
   const { titulo } = req.body
-  const novaTarefa = {
-    id: proximoId++,
-    titulo: titulo,
-    concluida: false
-  }
-  tarefas.push(novaTarefa)
+  const novaTarefa = await prisma.tarefa.create({
+    data: { titulo }
+  })
   res.status(201).json(novaTarefa)
 })
 
-// PUT /tarefas/:id → marca uma tarefa como concluída
-app.put('/tarefas/:id', (req, res) => {
+// PUT /tarefas/:id → alterna concluída/não concluída
+app.put('/tarefas/:id', async (req, res) => {
   const id = parseInt(req.params.id)
-  const tarefa = tarefas.find(t => t.id === id)
+
+  const tarefa = await prisma.tarefa.findUnique({ where: { id } })
 
   if (!tarefa) {
     return res.status(404).json({ erro: 'Tarefa não encontrada' })
   }
 
-  tarefa.concluida = !tarefa.concluida
-  res.json(tarefa)
+  const atualizada = await prisma.tarefa.update({
+    where: { id },
+    data: { concluida: !tarefa.concluida }
+  })
+
+  res.json(atualizada)
 })
 
 // DELETE /tarefas/:id → deleta uma tarefa
-app.delete('/tarefas/:id', (req, res) => {
+app.delete('/tarefas/:id', async (req, res) => {
   const id = parseInt(req.params.id)
-  tarefas = tarefas.filter(t => t.id !== id)
+  await prisma.tarefa.delete({ where: { id } })
   res.status(204).send()
 })
 
